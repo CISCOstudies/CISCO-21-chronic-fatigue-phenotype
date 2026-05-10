@@ -1,0 +1,590 @@
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(purrr)
+library(gridExtra)
+
+setwd("U:/Manuscript/Post_Exertional_Malaise")
+data <- read.csv("Analysis_file.csv", stringsAsFactors = FALSE)
+
+##Baseline ISWT plot
+plot_data <- data %>%
+  filter(!is.na(iswt_b), !is.na(pem_me_cfs))
+
+ ggplot(plot_data, aes(x = pem_me_cfs, y=iswt_b)) +
+  geom_violin(fill = "#B4CFEE", color = "#1F5189", trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "#F2F7FC", color = "black") +
+  labs(
+    Title = "Distribution by ME/CFS group",
+    x = "ME/CFS group",
+    y = "ISWT distance at baseline (m)"
+  ) +
+  theme_gray(base_size = 30) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)
+  )
+
+ggsave('ISWT_baseline.png', dpi = 600, height = 8, width = 8, unit = 'in')
+
+
+plot_data <- data %>%
+  filter(!is.na(iswt_fu), !is.na(pem_treat_arm))
+
+ggplot(plot_data, aes(x = pem_treat_arm, y=iswt_fu)) +
+  geom_violin(fill = "#B4CFEE", color = "grey50", trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "#F2F7FC", color = "black") +
+  labs(
+    Title = "Distribution by ME/CFS and treatment group",
+    x = "ME/CFS PEM group and tratment arm",
+    y = "ISWT distance at follow-up (metres)"
+  ) +
+  theme_gray(base_size = 30) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)
+  )
+
+
+###PROMS at enrolment
+
+#EQ5D HU
+plot_data <- data %>%
+  filter(!is.na(eq5d_hu), !is.na(pem_treat_arm))
+
+ggp1 <- ggplot(plot_data, aes(x = pem_me_cfs, y=eq5d_hu)) +
+  geom_violin(fill = "#B4CFEE", color = "#1F5189", trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "#F2F7FC", color = "black") +
+  labs(
+    Title = "Distribution by ME/CFS group",
+    x = "ME/CFS group",
+    y = "EQ-5D-5L Utility Score"
+  ) +
+  theme_gray(base_size = 20) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)
+  )
+
+plot_data <- data %>%
+  filter(!is.na(phq), !is.na(pem_treat_arm))
+
+#PHQ
+ggp2 <- ggplot(plot_data, aes(x = pem_me_cfs, y=phq)) +
+  geom_violin(fill = "#F8DDC9", color = "#B15716", trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "#F2F7FC", color = "black") +
+  labs(
+    Title = "Distribution by ME/CFS group",
+    x = "ME/CFS group",
+    y = "PHQ-4 Total Score"
+  ) +
+  theme_gray(base_size = 20) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)
+  )
+
+plot_data <- data %>%
+  filter(!is.na(bip), !is.na(pem_treat_arm))
+
+#BIP
+ggp3 <- ggplot(plot_data, aes(x = pem_me_cfs, y=bip)) +
+  geom_violin(fill = "#FFCFEF", color = "#88005B", trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "#F2F7FC", color = "black") +
+  labs(
+    Title = "Distribution by ME/CFS group",
+    x = "ME/CFS group",
+    y = "Brief Illness Perception Score"
+  ) +
+  theme_gray(base_size = 20) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)
+  )
+
+#DASI
+plot_data <- data %>%
+  filter(!is.na(dasi), !is.na(pem_treat_arm))
+
+ggp4 <- ggplot(plot_data, aes(x = pem_me_cfs, y=dasi)) +
+  geom_violin(fill = "#ECE8F7", color = "#5E3BAA", trim = FALSE) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "#F2F7FC", color = "black") +
+  labs(
+    Title = "Distribution by ME/CFS group",
+    x = "ME/CFS group",
+    y = "Duke Activity Status Index Score"
+  ) +
+  theme_gray(base_size = 20) +
+  theme(
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)
+  )
+
+grid.arrange(ggp1, ggp2,ggp3, ggp4, nrow=2)
+
+##Comparing ISWT in treatment arm vs none in PEM vs no PEM
+
+plot_data <- data %>%
+  select(pem_treat_arm, iswt_b, iswt_fu, id) %>%
+  filter(!is.na(pem_treat_arm)) %>%
+  pivot_longer(cols = c(iswt_b, iswt_fu),
+               names_to = "timepoint",
+               names_pattern = "iswt_(.*)",
+               values_to = "iswt") %>%
+  filter(!is.na(iswt))
+
+plot_data$timepoint <- factor(plot_data$timepoint, levels = c("b", "fu"),
+                              labels = c("Baseline", "Follow-up"))
+
+
+plot_data <- plot_data %>%
+  mutate(color_group = paste(pem_treat_arm, timepoint, sep = "_"))
+
+color_map <- c(
+  "PEM_Int_Baseline" = "#1F5189", "PEM_Int_Follow-up" = "#B4CFEE",
+  "PEM_SC_Baseline" = "#00B2A9", "PEM_SC_Follow-up" = "#BCFFFC",
+  "NoPEM_Int_Baseline" = "#981821", "NoPEM_Int_Follow-up" = "#F4B6BA",
+  "NoPEM_SC_Baseline" = "#C50084", "NoPEM_SC_Follow-up" = "#FFCFEF"
+)
+
+ggplot(plot_data, aes(x=timepoint, y = iswt, fill = color_group)) +
+  geom_violin (trim = FALSE, color=NA, alpha = 0.8) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white", color = "black") +
+  scale_fill_manual(values = color_map) +
+  labs(
+    title = "Distribution of ISWT by PEM Group and Timepoint",
+    x= "Timepoint",
+    y = "ISWT (m)"
+  )+
+  theme_gray(base_size = 14)+
+  theme(
+    legend.position = "none",
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5)
+  )
+
+#plot tidied up
+ggplot(plot_data, aes(x=timepoint, y = iswt, fill = color_group)) +
+  geom_violin (trim = FALSE, color=NA, alpha = 0.8) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white", color = "black") +
+  facet_wrap( ~ pem_treat_arm, ncol = 2) +
+  scale_fill_manual(values = color_map) +
+  labs(
+    title = "Distribution of ISWT by PEM Group and Timepoint",
+    x= "Timepoint",
+    y = "ISWT (m)"
+  )+
+  theme_grey(base_size = 14)+
+  theme(
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    strip.text = element_blank()
+  )
+
+
+
+#Line plot version of ISWT
+ggplot(plot_data, aes(x=timepoint, y = iswt)) +
+  geom_line(aes(group = id), color = "black", alpha = 0.7) +
+  geom_violin (aes(fill = color_group), trim = FALSE, color=NA, alpha = 0.8) +
+  geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white", color = "black") +
+  facet_wrap( ~ pem_treat_arm, ncol = 2) +
+  scale_fill_manual(values = color_map) +
+  labs(
+    title = "ISWT Change by Treatment Group",
+    x= "Timepoint",
+    y = "ISWT (m)"
+  )+
+  theme_gray(base_size = 14)+
+  theme(
+    panel.grid.major.x = element_blank(),
+    axis.text.x = element_text(angle = 0, hjust = 0.5),
+    strip.text = element_blank()
+  )
+
+
+##Accelerometry plots
+
+data <- data %>%
+  mutate(id= row_number())
+
+variable_prefixes <- c("sleep_time", "sleep_eff", "sed_time", "light_time", "mod_time", "vig_time")
+
+plot_by_variable <- function(var_prefix) {
+  long_data <- data %>%
+    select(id, pem_treat_arm, all_of(paste0(var_prefix, c("_b", "_fu")))) %>%
+    pivot_longer(cols = -c(id, pem_treat_arm),
+                 names_to = "timepoint",
+                 names_pattern = paste0(var_prefix, "_(.*)"),
+                 values_to = "value") %>%
+                   filter(!is.na(value), !is.na(pem_treat_arm)) %>%
+                   mutate(
+                     timepoint = factor(timepoint, levels = c("b", "fu"), labels = c("Baseline", "Follow-up")),
+                     color_group = paste(pem_treat_arm, timepoint, sep = "_")
+                   )
+  
+  ggplot(long_data, aes(x=value, fill=color_group)) +
+    geom_density(position = "identity", alpha = 0.7, color = "black") +
+    facet_wrap(~pem_treat_arm, ncol=2) +
+    scale_fill_manual(values= color_map) +
+    labs(
+      title = paste("Density plot of", toupper(var_prefix), "by Treatment Arm"),
+      x = var_prefix,
+      y = "Proportion of Participants"
+    ) +
+    theme_grey( base_size = 14)+
+    theme( strip.text = element_blank())
+  
+}
+
+  plots <- map(variable_prefixes, plot_by_variable)
+  
+  print(plots[[1]])
+  print(plots[[2]])
+  print(plots[[3]])
+  print(plots[[4]])
+  print(plots[[5]])
+  print(plots[[6]])
+    
+
+                     
+  plot_by_variable <- function(var_prefix) {
+    long_data <- data %>%
+      select(id, pem_treat_arm, all_of(paste0(var_prefix, c("_b", "_fu")))) %>%
+      pivot_longer(cols = -c(id, pem_treat_arm),
+                   names_to = "timepoint",
+                   names_pattern = paste0(var_prefix, "_(.*)"),
+                   values_to = "value") %>%
+      filter(!is.na(value), !is.na(pem_treat_arm)) %>%
+      mutate(
+        timepoint = factor(timepoint, levels = c("b", "fu"), labels = c("Baseline", "Follow-up")),
+        color_group = paste(pem_treat_arm, timepoint, sep = "_")
+      )
+    
+    ggplot(long_data, aes(x=timepoint, y = value, fill = color_group)) +
+      geom_line(aes(group = id), color = "black", alpha = 0.7) +
+      geom_violin (aes(fill = color_group), trim = FALSE, color=NA, alpha = 0.8) +
+      geom_boxplot(width = 0.1, outlier.shape = NA, fill = "white", color = "black") +
+      facet_wrap(~pem_treat_arm, ncol=2) +
+      scale_fill_manual(values= color_map) +
+      labs(
+        title = paste("", toupper(var_prefix), "by Treatment Arm"),
+        x = var_prefix,
+        y = "Minutes"
+      ) +
+      theme_grey( base_size = 14)+
+      theme( strip.text = element_blank())
+    
+  }
+  
+  plots <- map(variable_prefixes, plot_by_variable)
+  
+  print(plots[[1]])
+  print(plots[[2]])
+  print(plots[[3]])
+  print(plots[[4]])
+  print(plots[[5]])
+  print(plots[[6]])
+
+
+
+#Adherence plot
+df <- read_csv("Data/Intervention_Yes_No.csv") %>%
+  rename(Adherence_Level = 1) %>%
+  pivot_longer(-Adherence_Level, names_to = "Criteria", values_to = "Count")
+
+df_percent <- df %>%
+  group_by(Adherence_Level) %>%
+  mutate(Percent = Count / sum(Count) * 100)
+
+
+#Bar plot
+ggplot(df_percent, aes(x = Adherence_Level, y = Count, fill = Adherence_Level)) +
+  facet_wrap(~ Criteria) +
+  scale_fill_manual(values = c("#D1D2D3", "#F9D78C", "#B3D4EB")) +
+  geom_bar(stat = "identity", position = "dodge", color = "black")+
+  coord_flip() +
+  labs(x = "", y = "Number of Participants") +
+  theme_grey(base_size = 16) +
+  theme(legend.position = "none")
+
+
+
+#EQ5D plot
+data <- read_csv("Data/EQ5D.csv")
+
+
+data <- data %>% rename(response = domain)
+
+level_map <- tribble(
+  ~response_pattern,                 ~level,
+  "no problems|no pain|not anxious",    "1 - No problems",
+  "slight problems|slight pain|slightly anxious",    "2 - Slight problems",
+  "moderate problems|moderate pain|moderately anxious",  "3 - Moderate problems",
+  "severe problems|severe pain|severely anxious",  "4 - Severe problems",
+  "unable|extreme|extreme anxiety",     "5 - Extreme / Unable"
+)
+
+assign_level <- function(resp) {
+  resp_lower <- tolower(resp)
+  matched <- level_map %>%
+    filter(str_detect(resp_lower, response_pattern)) %>%
+    slice(1) %>%
+    pull(level)
+  if(length(matched) == 0) return(NA_character_) else return(matched)
+}
+
+#set colours for levels
+level_colors <- c(
+  "1 - No problems" = "#B4CFEE",
+  "2 - Slight problems" = "#1F5189",
+  "3 - Moderate problems" = "#FFE8AE",
+  "4 - Severe problems" = "#E37222",
+  "5 - Extreme / Unable" = "#981821"
+)
+
+
+
+data <- data %>%
+  mutate(level = map_chr(response, assign_level))
+
+long_data <- data %>%
+  pivot_longer(cols = starts_with(c("No_", "Yes_")),
+               names_to = "group",
+               values_to = "count")
+
+percent_data <- long_data %>%
+  group_by(feature, timepoint, group) %>%
+  mutate(total = sum(count)) %>%
+  ungroup() %>%
+  mutate(percentage = ifelse(total > 0, (count / total) * 100, 0)) %>%
+  filter(!is.na(level))
+
+percent_data <- percent_data %>%
+  mutate(level = factor(level, levels = (names(level_colors))),
+         timepoint = factor(timepoint, levels = c("pre", "post")),
+         group = factor(group, levels = c("No_Intervention", "No_StandardCare", "Yes_Intervention", "Yes_StandardCare")),
+         feature = factor(feature))
+
+#Rename vavriables
+group_labels <- c(
+  "No_Intervention" = "Intervention",
+  "No_StandardCare" = "Standard Care",
+  "Yes_Intervention" = "Intervention",
+  "Yes_StandardCare" = "Standard Care"
+)
+
+feature_labels <- c(
+  "mobility" = "Mobility",
+  "self-care" = "Self-Care",
+  "usual activities" = "Usual Activities",
+  "pain discomfort" = "Pain or Discomfort",
+  "anxious depressed" = "Anxiety or Depression"
+)
+
+#Final plot
+ggplot(percent_data, aes(x = timepoint, y = percentage, fill = level)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  facet_grid(group ~ feature, scales = "free_x",
+             labeller = labeller(group = group_labels, feature = feature_labels)) +
+  scale_fill_manual(values = level_colors, drop = FALSE) +
+  labs(title = "EQ-5D Response Levels Distribution Pre and Post Intervention",
+       x = "Timepoint",
+       y = "% of Participants",
+       fill = "Response Level") +
+  theme_gray(base_size = 16) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+#Healtchare interaction plots
+
+
+
+
+#load data
+data <- read_csv("Data/Healthcare.csv")
+
+#set colours
+number_levels <- as.character(0:5)
+number_colors <- c(
+  
+  "0" = "#00B2A9",
+  "1" = "#B4CFEE",  
+  "2" = "#1F5189",  
+  "3" = "#FFE8AE",  
+  "4" = "#F47B20",  
+  "5" = "#981821"   
+)
+
+#Plot nursing interactions
+
+allowed_types <- c("nurseclinic",  "nursephone", "nursehome")
+df <- data %>% filter(type %in% allowed_types)
+
+df_plot <- df %>%
+  pivot_longer(
+    cols = starts_with("No_") | starts_with("Yes_"),
+    names_to = "group", values_to = "count"
+  ) %>%
+  separate(group, into = c("intervention_status", "care_type"), sep = "_") %>%
+  # compute percent **within each (type, care_type, intervention_status)** slice
+  group_by(type, care_type, intervention_status) %>%
+  mutate(percent = count / sum(count) * 100) %>%
+  ungroup()
+
+
+
+ggplot(df_plot, aes(x = factor(number), y = percent, fill = factor(number))) +
+  geom_col(position = position_dodge(width = 0.9), color = "black") +
+  # add counts on top of each bar
+  geom_text(
+    aes(label = count),
+    position = position_dodge(width = 0.9),
+    vjust = -0.25,
+    size = 3
+  ) +
+  facet_grid(
+    intervention_status ~ type + care_type,
+    scales = "free_y"
+  ) +
+  labs(
+    title = "Distribution of Interaction Counts (0–5)\nby CareType & Status",
+    x = "Number of Interactions", y = "Percentage",
+    fill = "Number"
+  ) +
+  scale_fill_manual(
+    values = number_colors,
+    breaks = number_levels
+  ) +
+  scale_y_continuous(
+    labels = percent_format(scale = 1),
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_grey(base_size = 14) +
+  theme(
+    strip.placement        = "outside",
+    strip.text.y.left      = element_blank(),
+    strip.text.y.right     = element_text(angle = 0, hjust = 0),
+    strip.text.x           = element_text(angle = 0, vjust = 0.5),
+    panel.spacing          = unit(0.5, "lines"),
+    plot.margin            = margin(r = 10, l = 10, t = 10, b = 10)
+  )
+
+
+
+
+#GP plots
+allowed_types <- c("gpclinic",  "gpphone", "gphome")
+df <- data %>% filter(type %in% allowed_types)
+
+#Plot GP interactions
+df_plot <- df %>%
+  pivot_longer(
+    cols = starts_with("No_") | starts_with("Yes_"),
+    names_to = "group", values_to = "count"
+  ) %>%
+  separate(group, into = c("intervention_status", "care_type"), sep = "_") %>%
+  # compute percent **within each (type, care_type, intervention_status)** slice
+  group_by(type, care_type, intervention_status) %>%
+  mutate(percent = count / sum(count) * 100) %>%
+  ungroup()
+
+
+ggplot(df_plot, aes(x = factor(number), y = percent, fill = factor(number))) +
+  geom_col(position = position_dodge(width = 0.9), color = "black") +
+  # add counts on top of each bar
+  geom_text(
+    aes(label = count),
+    position = position_dodge(width = 0.9),
+    vjust = -0.25,
+    size = 3
+  ) +
+  facet_grid(
+    intervention_status ~ type + care_type,
+    scales = "free_y"
+  ) +
+  labs(
+    title = "Distribution of Interaction Counts (0–5)\nby CareType & Status",
+    x = "Number of Interactions", y = "Percentage",
+    fill = "Number"
+  ) +
+  scale_fill_manual(
+    values = number_colors,
+    breaks = number_levels
+  ) +
+  scale_y_continuous(
+    labels = percent_format(scale = 1),
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_grey(base_size = 14) +
+  theme(
+    strip.placement        = "outside",
+    strip.text.y.left      = element_blank(),
+    strip.text.y.right     = element_text(angle = 0, hjust = 0),
+    strip.text.x           = element_text(angle = 0, vjust = 0.5),
+    panel.spacing          = unit(0.5, "lines"),
+    plot.margin            = margin(r = 10, l = 10, t = 10, b = 10)
+  )
+
+
+
+#Physio plots
+allowed_types <- c("physioclinic",  "physiophone", "physiohome")
+df <- data %>% filter(type %in% allowed_types)
+
+#Plot physio interactions
+df_plot <- df %>%
+  pivot_longer(
+    cols = starts_with("No_") | starts_with("Yes_"),
+    names_to = "group", values_to = "count"
+  ) %>%
+  separate(group, into = c("intervention_status", "care_type"), sep = "_") %>%
+  # compute percent **within each (type, care_type, intervention_status)** slice
+  group_by(type, care_type, intervention_status) %>%
+  mutate(percent = count / sum(count) * 100) %>%
+  ungroup()
+
+
+ggplot(df_plot, aes(x = factor(number), y = percent, fill = factor(number))) +
+  geom_col(position = position_dodge(width = 0.9), color = "black") +
+  # add counts on top of each bar
+  geom_text(
+    aes(label = count),
+    position = position_dodge(width = 0.9),
+    vjust = -0.25,
+    size = 3
+  ) +
+  facet_grid(
+    intervention_status ~ type + care_type,
+    scales = "free_y"
+  ) +
+  labs(
+    title = "Distribution of Interaction Counts (0–5)\nby CareType & Status",
+    x = "Number of Interactions", y = "Percentage",
+    fill = "Number"
+  ) +
+  scale_fill_manual(
+    values = number_colors,
+    breaks = number_levels
+  ) +
+  scale_y_continuous(
+    labels = percent_format(scale = 1),
+    expand = expansion(mult = c(0, 0.1))
+  ) +
+  theme_grey(base_size = 14) +
+  theme(
+    strip.placement        = "outside",
+    strip.text.y.left      = element_blank(),
+    strip.text.y.right     = element_text(angle = 0, hjust = 0),
+    strip.text.x           = element_text(angle = 0, vjust = 0.5),
+    panel.spacing          = unit(0.5, "lines"),
+    plot.margin            = margin(r = 10, l = 10, t = 10, b = 10)
+  )
+
