@@ -2,7 +2,7 @@
 
 Effects of resistance exercise in a chronic fatigue phenotype of Long COVID: A secondary analysis of the CISCO-21 trial
 
-Anna Kamdar PhD 1, Gemma McKinley BSc 2, Hannah Bayes MBChB PhD 3, David Anderson MBChB 4, Chim C Lang MD 5,6, Adam Gill 4 BN, Andrew Morrow MBChB PhD 1, Robert Sykes MBChB MRes 1, Diann Taggart 4, Paul Welsh PhD 1, Susan Dawkes PhD 7, Alex McConnachie PhD 2, Stuart R Gray PhD 1, Colin Berry BSc MBChB PhD1*.
+Anna Kamdar PhD 1, Gemma McKinley BSc 2, Hannah Bayes MBChB PhD 3, David Anderson MBChB 4, Chim C Lang MD 5,6, Adam Gill BN 4, Andrew Morrow MBChB PhD 1, Robert Sykes MBChB MRes 1, Diann Taggart 4, Paul Welsh PhD 1, Susan Dawkes PhD 7, Alex McConnachie PhD 2, Stuart R Gray PhD 1, Colin Berry BSc MBChB PhD 1 *.
 
 1 School of Cardiovascular and Metabolic Health, University Place, University of Glasgow, Glasgow, United Kingdom, G12 8TA
 2 Robertson Centre for Biostatistics, School of Health and Wellbeing, University of Glasgow, Glasgow, United Kingdom G12 8TA
