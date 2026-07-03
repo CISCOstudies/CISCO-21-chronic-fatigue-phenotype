@@ -1,0 +1,1544 @@
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+setwd("U:/Manuscript/Post_Exertional_Malaise")
+data <- read.csv("Analysis_file.csv", stringsAsFactors = FALSE)
+
+
+###Set factors
+data <- data %>%
+  mutate(across(c(
+    pem_group,
+    treat,
+    site,
+    simd_quintile,
+    sex,
+    group,
+    histc19pneu,
+    ethnicity_simple,
+    smoke,
+    hcw,
+    icuw,
+    rhythm,
+    diag_clin,
+    diag_pcr,
+    diag_antibody,
+    diag_antigen,
+    diag_cxr,
+    diag_ct,
+    diag_radbio,
+    treat_oxygen,
+    treat_ninvresp,
+    treat_invvent,
+    treat_ecmo,
+    treat_inotropes,
+    treat_hd,
+    hosp,
+    who,
+    hb_120f,
+    hb_130m,
+    crp_5,
+    ipaq_cat,
+    dyspnoea,
+    fried_weak,
+    fried_slow,
+    fried_weight,
+    fried_tired,
+    fried_active,
+    frailty_fried,
+    frailty_best,
+    frailty_current,
+    pem_dhf_f,
+    pem_dhf_s,
+    pem_nds_f,
+    pem_nds_s,
+    pem_mts_f,
+    pem_mts_s,
+    pem_mpt_f,
+    pem_mpt_s,
+    pem_pds_f,
+    pem_pds_s,
+    pem_recover,
+    pem_worsen_p,
+    pem_worsen_m,
+    pem_duration,
+    acc_data_b,
+    eq5d_mo_bl,
+    eq5d_sc_bl,
+    eq5d_ua_bl,
+    eq5d_pd_bl,
+    eq5d_ad_bl,
+    pre_ang,
+    mi,
+    prev_revasc,
+    hf,
+    low_ef,
+    stroke,
+    tia,
+    af,
+    vt,
+    aortic,
+    mitral,
+    pulm,
+    tric,
+    hypercard,
+    arcard,
+    rvcard,
+    hypert,
+    congen,
+    asthma,
+    bronch,
+    copd,
+    rhino,
+    pneu,
+    lungc,
+    lungf,
+    pleural,
+    conio,
+    eosino,
+    pvd,
+    sarcoid,
+    sleepap,
+    c19pneu,
+    cov_reinf,
+    n_reinf,
+    n_reinf_hosp,
+    cov_vax,	
+    cov_vax2,
+    cov_vax3,
+    cov_vax4,
+    treat_arm,
+    eq5d_mo_fu,
+    eq5d_sc_fu,
+    eq5d_ua_fu,
+    eq5d_pd_fu,
+    eq5d_ad_fu,
+    iswt_tired_b,
+    iswt_breath_b,
+    iswt_chest_b,
+    iswt_joint_b,
+    iswt_tired_fu,
+    iswt_breath_fu,
+    iswt_chest_fu,
+    iswt_joint_fu,
+    ipaq_cat_fu,
+    ch_ipaq_cat_fu,
+    acc_data_fu,
+    gp_any,
+    gp_home,
+    gp_clinic,
+    gp_phone,
+    gp_num,
+    gp_num_5,
+    pn_any,
+    pn_home,
+    pn_clinic,
+    pn_num,
+    pn_num_5,
+    cac_any,
+    cac_home,
+    cac_clinic,
+    cac_num,
+    physio_any,
+    physio_home,
+    physio_clinic,
+    physio_num,
+    rehab_any,
+    rehab_home,
+    rehab_clinic,
+    rehab_num,
+    aande_any,
+    aande_num,
+    amru_any,
+    amru_num,
+    icu_any,
+    icu_num,
+    ccu_any,
+    ccu_num,
+    med_any,
+    med_num,
+    coe_any,
+    coe_num,
+    surg_any,
+    surg_num,
+    adh,
+    iswt_tired_ch,
+    iswt_breath_ch,
+    iswt_chest_ch,
+    iswt_joint_ch
+    
+  ), as.factor))
+
+#Summarise the numerical data
+
+summarize_numeric <- function(var, group) {
+  df <- data %>%
+    select(all_of(c(var,group))) %>%
+    drop_na()
+  
+  ##sense check
+  if (nlevels(factor(df[[group]])) !=2) {
+    stop(paste("Grouping variable", group, "must have 2 levels to proceed. If not, check underlying file"))
+  }
+  
+  
+  
+  #Function to summarise
+  
+  get_stats <- function(x) {
+    tibble(
+      mean = round(mean(x), 2),
+      sd = round(sd(x), 2),
+      median = round(median(x), 2),
+      Q1 = round(quantile(x, 0.25), 2),
+      Q3 = round(quantile(x, 0.75), 2),
+      IQR = round(IQR(x), 2)
+    )
+  }
+  
+  all_stats <- df %>%
+    summarise (get_stats(.data[[var]])) %>%
+    mutate(Group = "All")
+  
+  by_group <- df %>%
+    group_by(.data[[group]]) %>%
+    summarise(get_stats(.data[[var]]), .group = "drop") %>%
+    rename(Group = 1)
+  
+  test <- wilcox.test(reformulate(group, var), data = df)
+  pval <- round(test$p.value, 3)
+  
+  bind_rows(all_stats, by_group) %>%
+    mutate(variable = var,
+           value = paste0(
+             mean, " (", sd, "); ",
+             median, " (", Q1, ", ", Q3, ")"
+           ),
+           p = if_else(Group == "All", as.character(pval), "")) %>%
+    select(variable, Group, value, p)
+}
+
+
+
+#Now summarise the categorical data
+
+summarize_categorical <- function(var, group) {
+  df <- data %>%
+    select(all_of(c(var,group))) %>%
+    drop_na()
+  
+  df[[var]] <- as.factor(df[[var]])
+  df[[group]] <- as.factor(df[[group]])
+  
+  all_stats <- df %>%
+    group_by(.data[[var]]) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    mutate(percent = round(n / sum(n)*100, 1),
+           Group = "All") %>%
+    mutate(value = paste0(n, " (", percent, "%)")) %>%
+    select(Group, value, !!sym(var))
+  
+  by_group <- df %>%
+    group_by(.data[[group]], .data[[var]]) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(.data[[group]]) %>%
+    mutate(percent = round(n/ sum(n)*100, 1)) %>%
+    mutate(value = paste0(n, " (", percent, "%)")) %>%
+    rename(Group = 1) %>%
+    select(Group, value, !!sym(var))
+  
+  chi <- suppressWarnings(chisq.test(table(df[[var]], df[[group]])))
+  pval <- round(chi$p.value, 3)
+  
+  bind_rows(all_stats, by_group) %>%
+    rename(level = 3) %>%
+    mutate(variable = var,
+           p= if_else(Group == "All" & row_number() == 1, as.character(pval), "")) %>%
+    select(variable, level, Group, value, p)
+}
+
+
+
+####Define variables here
+numeric_vars <- c("age",
+                  "height",
+                  "weight",
+                  "bmi",
+                  "waist",
+                  "sbp",
+                  "dbp",
+                  "hr",
+                  "coviddays",
+                  "hb",
+                  "wcc",
+                  "na",
+                  "creat",
+                  "gluc",
+                  "hba1c",
+                  "crp",
+                  "plate",
+                  "ddimer",
+                  "urea",
+                  "bili",
+                  "alt",
+                  "ast",
+                  "alp",
+                  "alb",
+                  "ntprobnp",
+                  "chol",
+                  "trig",
+                  "hdl",
+                  "ldl",
+                  "vldl",
+                  "tni",
+                  "egfr",
+                  "pefr",
+                  "fvc",
+                  "fev1",
+                  "fev1fvc",
+                  "grip",
+                  "sppb",
+                  "eq5d_hu",
+                  "eq5d_vas",
+                  "phq_anx",
+                  "phq_dep",
+                  "phq",
+                  "bip",
+                  "dasi",
+                  "dasi_vo2max",
+                  "fatigue_score",
+                  "sleep_time_b",
+                  "sleep_eff_b",
+                  "sed_time_b",
+                  "light_time_b",
+                  "mod_time_b",
+                  "vig_time_b",
+                  "fatigue_vas",
+                  "iswt_b",
+                  "iswt_shuttles_b",
+                  "iswt_shuttles_imp_b",
+                  "iswt_fu",
+                  "ch_iswt_fu",
+                  "iswt_shuttles_fu",
+                  "iswt_shuttles_imp_fu",
+                  "eq5d_hu_fu",
+                  "ch_eq5d_hu_fu",
+                  "eq5d_vas_fu",
+                  "ch_eq5d_vas_fu",
+                  "phq_anx_fu",
+                  "ch_phq_anx_fu",
+                  "phq_dep_fu",
+                  "ch_phq_dep_fu",
+                  "phq_fu",
+                  "ch_phq_fu",
+                  "bip_fu",
+                  "ch_bip_fu",
+                  "dasi_fu",
+                  "dasi_vo2max_fu",
+                  "ch_dasi_fu",
+                  "ch_dasi_vo2max_fu",
+                  "fatigue_score_fu",
+                  "ch_fatigue_score_fu",
+                  "fatigue_vas_fu",
+                  "ch_fatigue_vas_fu",
+                  "sleep_time_fu",
+                  "ch_sleep_time_fu",
+                  "sleep_eff_fu",
+                  "ch_sleep_eff_fu",
+                  "sed_time_fu",
+                  "ch_sed_time_fu",
+                  "light_time_fu",
+                  "ch_light_time_fu",
+                  "mod_time_fu",
+                  "ch_mod_time_fu",
+                  "vig_time_fu",
+                  "ch_vig_time_fu",
+                  "gp_time",
+                  "pn_time",
+                  "physio_time",
+                  "aande_time",
+                  "pred_ISWT",
+                  "predic_minus_act_b",
+                  "predic_minus_act_fu"
+                  
+                  
+)
+
+categorical_vars <- c("treat",
+                      "site",
+                      "simd_quintile",
+                      "sex",
+                      "group",
+                      "histc19pneu",
+                      "ethnicity_simple",
+                      "smoke",
+                      "hcw",
+                      "icuw",
+                      "rhythm",
+                      "diag_clin",
+                      "diag_pcr",
+                      "diag_antibody",
+                      "diag_antigen",
+                      "diag_cxr",
+                      "diag_ct",
+                      "diag_radbio",
+                      "treat_oxygen",
+                      "treat_ninvresp",
+                      "treat_invvent",
+                      "treat_ecmo",
+                      "treat_inotropes",
+                      "treat_hd",
+                      "hosp",
+                      "who",
+                      "hb_120f",
+                      "hb_130m",
+                      "crp_5",
+                      "ipaq_cat",
+                      "dyspnoea",
+                      "fried_weak",
+                      "fried_slow",
+                      "fried_weight",
+                      "fried_tired",
+                      "fried_active",
+                      "frailty_fried",
+                      "frailty_best",
+                      "frailty_current",
+                      "pem_dhf_f",
+                      "pem_dhf_s",
+                      "pem_nds_f",
+                      "pem_nds_s",
+                      "pem_mts_f",
+                      "pem_mts_s",
+                      "pem_mpt_f",
+                      "pem_mpt_s",
+                      "pem_pds_f",
+                      "pem_pds_s",
+                      "pem_recover",
+                      "pem_worsen_p",
+                      "pem_worsen_m",
+                      "pem_duration",
+                      "acc_data_b",
+                      "eq5d_mo_bl",
+                      "eq5d_sc_bl",
+                      "eq5d_ua_bl",
+                      "eq5d_pd_bl",
+                      "eq5d_ad_bl",
+                      "pre_ang",
+                      "mi",
+                      "prev_revasc",
+                      "hf",
+                      "low_ef",
+                      "stroke",
+                      "tia",
+                      "af",
+                      "vt",
+                      "aortic",
+                      "mitral",
+                      "pulm",
+                      "tric",
+                      "hypercard",
+                      "arcard",
+                      "rvcard",
+                      "hypert",
+                      "congen",
+                      "asthma",
+                      "bronch",
+                      "copd",
+                      "rhino",
+                      "pneu",
+                      "lungc",
+                      "lungf",
+                      "pleural",
+                      "conio",
+                      "eosino",
+                      "pvd",
+                      "sarcoid",
+                      "sleepap",
+                      "c19pneu",
+                      "cov_reinf",
+                      "n_reinf",
+                      "n_reinf_hosp",
+                      "cov_vax",
+                      "cov_vax2",
+                      "cov_vax3",
+                      "cov_vax4",
+                      "treat_arm",
+                      "eq5d_mo_fu",
+                      "eq5d_sc_fu",
+                      "eq5d_ua_fu",
+                      "eq5d_pd_fu",
+                      "eq5d_ad_fu",
+                      "iswt_tired_b",
+                      "iswt_breath_b",
+                      "iswt_chest_b",
+                      "iswt_joint_b",
+                      "iswt_tired_fu",
+                      "iswt_breath_fu",
+                      "iswt_chest_fu",
+                      "iswt_joint_fu",
+                      "ipaq_cat_fu",
+                      "ch_ipaq_cat_fu",
+                      "acc_data_fu",
+                      "gp_any",
+                      "gp_home",
+                      "gp_clinic",
+                      "gp_phone",
+                      "gp_num",
+                      "gp_num_5",
+                      "pn_any",
+                      "pn_home",
+                      "pn_clinic",
+                      "pn_num",
+                      "pn_num_5",
+                      "cac_any",
+                      "cac_home",
+                      "cac_clinic",
+                      "cac_num",
+                      "physio_any",
+                      "physio_home",
+                      "physio_clinic",
+                      "physio_num",
+                      "rehab_any",
+                      "rehab_home",
+                      "rehab_clinic",
+                      "rehab_num",
+                      "aande_any",
+                      "aande_num",
+                      "amru_any",
+                      "amru_num",
+                      "icu_any",
+                      "icu_num",
+                      "ccu_any",
+                      "ccu_num",
+                      "med_any",
+                      "med_num",
+                      "coe_any",
+                      "coe_num",
+                      "surg_any",
+                      "surg_num",
+                      "adh",
+                      "iswt_tired_ch",
+                      "iswt_breath_ch",
+                      "iswt_chest_ch",
+                      "iswt_joint_ch"
+)
+
+
+
+
+#Run the function
+
+numeric_summary <- bind_rows(lapply(numeric_vars, summarize_numeric, group = "pem_me_cfs"))
+categorical_summary <- bind_rows(lapply(categorical_vars, summarize_categorical, group = "pem_me_cfs"))
+
+
+summary_table <- bind_rows(
+  numeric_summary %>% mutate(level = ""),
+  categorical_summary
+)
+
+
+summary_table_wide <- summary_table %>%
+  pivot_wider(names_from = Group, values_from = c(value, p), names_sep = "_") %>%
+  select(variable, level, starts_with("value"), starts_with("p"))
+
+print(summary_table_wide)
+write.csv(summary_table_wide, "summary_table_pe_me_cfs_yesno.csv", row.names = FALSE)
+
+
+
+##Number of observations
+
+data %>%
+  pivot_longer(
+    cols = c(sleep_time_b, sleep_eff_b, sed_time_b, light_time_b, mod_time_b, vig_time_b),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  group_by(pem_me_cfs, variable) %>%
+  summarise(
+    n_obs = sum(!is.na(value)),
+    n_missing = sum(is.na(value)),
+    .groups = "drop"
+  )
+
+
+data <- read.csv("Analysis_file.csv", stringsAsFactors = FALSE)
+
+
+###Set factors
+data <- data %>%
+  mutate(across(c(
+    pem_group,
+    treat,
+    site,
+    simd_quintile,
+    sex,
+    group,
+    histc19pneu,
+    ethnicity_simple,
+    smoke,
+    hcw,
+    icuw,
+    rhythm,
+    diag_clin,
+    diag_pcr,
+    diag_antibody,
+    diag_antigen,
+    diag_cxr,
+    diag_ct,
+    diag_radbio,
+    treat_oxygen,
+    treat_ninvresp,
+    treat_invvent,
+    treat_ecmo,
+    treat_inotropes,
+    treat_hd,
+    hosp,
+    who,
+    hb_120f,
+    hb_130m,
+    crp_5,
+    ipaq_cat,
+    dyspnoea,
+    fried_weak,
+    fried_slow,
+    fried_weight,
+    fried_tired,
+    fried_active,
+    frailty_fried,
+    frailty_best,
+    frailty_current,
+    pem_dhf_f,
+    pem_dhf_s,
+    pem_nds_f,
+    pem_nds_s,
+    pem_mts_f,
+    pem_mts_s,
+    pem_mpt_f,
+    pem_mpt_s,
+    pem_pds_f,
+    pem_pds_s,
+    pem_recover,
+    pem_worsen_p,
+    pem_worsen_m,
+    pem_duration,
+    acc_data_b,
+    eq5d_mo_bl,
+    eq5d_sc_bl,
+    eq5d_ua_bl,
+    eq5d_pd_bl,
+    eq5d_ad_bl,
+    pre_ang,
+    mi,
+    prev_revasc,
+    hf,
+    low_ef,
+    stroke,
+    tia,
+    af,
+    vt,
+    aortic,
+    mitral,
+    pulm,
+    tric,
+    hypercard,
+    arcard,
+    rvcard,
+    hypert,
+    congen,
+    asthma,
+    bronch,
+    copd,
+    rhino,
+    pneu,
+    lungc,
+    lungf,
+    pleural,
+    conio,
+    eosino,
+    pvd,
+    sarcoid,
+    sleepap,
+    c19pneu,
+    cov_reinf,
+    n_reinf,
+    n_reinf_hosp,
+    cov_vax,	
+    cov_vax2,
+    cov_vax3,
+    cov_vax4,
+    treat_arm,
+    eq5d_mo_fu,
+    eq5d_sc_fu,
+    eq5d_ua_fu,
+    eq5d_pd_fu,
+    eq5d_ad_fu,
+    iswt_tired_b,
+    iswt_breath_b,
+    iswt_chest_b,
+    iswt_joint_b,
+    iswt_tired_fu,
+    iswt_breath_fu,
+    iswt_chest_fu,
+    iswt_joint_fu,
+    ipaq_cat_fu,
+    ch_ipaq_cat_fu,
+    acc_data_fu,
+    gp_any,
+    gp_home,
+    gp_clinic,
+    gp_phone,
+    gp_num,
+    gp_num_5,
+    pn_any,
+    pn_home,
+    pn_clinic,
+    pn_num,
+    pn_num_5,
+    cac_any,
+    cac_home,
+    cac_clinic,
+    cac_num,
+    physio_any,
+    physio_home,
+    physio_clinic,
+    physio_num,
+    rehab_any,
+    rehab_home,
+    rehab_clinic,
+    rehab_num,
+    aande_any,
+    aande_num,
+    amru_any,
+    amru_num,
+    icu_any,
+    icu_num,
+    ccu_any,
+    ccu_num,
+    med_any,
+    med_num,
+    coe_any,
+    coe_num,
+    surg_any,
+    surg_num,
+    adh,
+    iswt_tired_ch,
+    iswt_breath_ch,
+    iswt_chest_ch,
+    iswt_joint_ch
+    
+  ), as.factor))
+
+#Summarise the numerical data
+
+summarize_numeric <- function(var, group) {
+  df <- data %>%
+    select(all_of(c(var,group))) %>%
+    drop_na()
+  
+  ##sense check
+  if (nlevels(factor(df[[group]])) < 2) {
+    stop(paste("Grouping variable", group, "must have 2 levels to proceed. If not, check underlying file"))
+  }
+  
+  
+  
+  #Function to summarise
+  
+  get_stats <- function(x) {
+    tibble(
+      mean = round(mean(x), 2),
+      sd = round(sd(x), 2),
+      median = round(median(x), 2),
+      Q1 = round(quantile(x, 0.25), 2),
+      Q3 = round(quantile(x, 0.75), 2),
+      IQR = round(IQR(x), 2)
+    )
+  }
+  
+  all_stats <- df %>%
+    summarise (get_stats(.data[[var]])) %>%
+    mutate(Group = "All")
+  
+  by_group <- df %>%
+    group_by(.data[[group]]) %>%
+    summarise(get_stats(.data[[var]]), .group = "drop") %>%
+    rename(Group = 1)
+  
+  test <- kruskal.test(reformulate(group, var), data = df)
+  pval <- round(test$p.value, 3)
+  
+  bind_rows(all_stats, by_group) %>%
+    mutate(variable = var,
+           value = paste0(
+             mean, " (", sd, "); ",
+             median, " (", Q1, ", ", Q3, ")"
+           ),
+           p = if_else(Group == "All", as.character(pval), "")
+    ) %>%
+    select(variable, Group, value, p)
+}
+
+
+
+#Now summarise the categorical data
+
+summarize_categorical <- function(var, group) {
+  df <- data %>%
+    select(all_of(c(var,group))) %>%
+    drop_na()
+  
+  df[[var]] <- as.factor(df[[var]])
+  df[[group]] <- as.factor(df[[group]])
+  
+  all_stats <- df %>%
+    group_by(.data[[var]]) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    mutate(percent = round(n / sum(n)*100, 1),
+           Group = "All") %>%
+    mutate(value = paste0(n, " (", percent, "%)")) %>%
+    select(Group, value, !!sym(var))
+  
+  by_group <- df %>%
+    group_by(.data[[group]], .data[[var]]) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(.data[[group]]) %>%
+    mutate(percent = round(n/ sum(n)*100, 1)) %>%
+    mutate(value = paste0(n, " (", percent, "%)")) %>%
+    rename(Group = 1) %>%
+    select(Group, value, !!sym(var))
+  
+  chi <- suppressWarnings(chisq.test(table(df[[var]], df[[group]])))
+  pval <- round(chi$p.value, 3)
+  
+  bind_rows(all_stats, by_group) %>%
+    rename(level = 3) %>%
+    mutate(variable = var,
+           p= if_else(Group == "All" & row_number() == 1, as.character(pval), "")) %>%
+    select(variable, level, Group, value, p)
+}
+
+
+
+####Define variables here
+
+numeric_vars <- c("age",
+                  "height",
+                  "weight",
+                  "bmi",
+                  "waist",
+                  "sbp",
+                  "dbp",
+                  "hr",
+                  "coviddays",
+                  "hb",
+                  "wcc",
+                  "na",
+                  "creat",
+                  "gluc",
+                  "hba1c",
+                  "crp",
+                  "plate",
+                  "ddimer",
+                  "urea",
+                  "bili",
+                  "alt",
+                  "ast",
+                  "alp",
+                  "alb",
+                  "ntprobnp",
+                  "chol",
+                  "trig",
+                  "hdl",
+                  "ldl",
+                  "vldl",
+                  "tni",
+                  "egfr",
+                  "pefr",
+                  "fvc",
+                  "fev1",
+                  "fev1fvc",
+                  "grip",
+                  "sppb",
+                  "eq5d_hu",
+                  "eq5d_vas",
+                  "phq_anx",
+                  "phq_dep",
+                  "phq",
+                  "bip",
+                  "dasi",
+                  "dasi_vo2max",
+                  "fatigue_score",
+                  "sleep_time_b",
+                  "sleep_eff_b",
+                  "sed_time_b",
+                  "light_time_b",
+                  "mod_time_b",
+                  "vig_time_b",
+                  "fatigue_vas",
+                  "iswt_b",
+                  "iswt_shuttles_b",
+                  "iswt_shuttles_imp_b",
+                  "iswt_fu",
+                  "ch_iswt_fu",
+                  "iswt_shuttles_fu",
+                  "iswt_shuttles_imp_fu",
+                  "eq5d_hu_fu",
+                  "ch_eq5d_hu_fu",
+                  "eq5d_vas_fu",
+                  "ch_eq5d_vas_fu",
+                  "phq_anx_fu",
+                  "ch_phq_anx_fu",
+                  "phq_dep_fu",
+                  "ch_phq_dep_fu",
+                  "phq_fu",
+                  "ch_phq_fu",
+                  "bip_fu",
+                  "ch_bip_fu",
+                  "dasi_fu",
+                  "dasi_vo2max_fu",
+                  "ch_dasi_fu",
+                  "ch_dasi_vo2max_fu",
+                  "fatigue_score_fu",
+                  "ch_fatigue_score_fu",
+                  "fatigue_vas_fu",
+                  "ch_fatigue_vas_fu",
+                  "sleep_time_fu",
+                  "ch_sleep_time_fu",
+                  "sleep_eff_fu",
+                  "ch_sleep_eff_fu",
+                  "sed_time_fu",
+                  "ch_sed_time_fu",
+                  "light_time_fu",
+                  "ch_light_time_fu",
+                  "mod_time_fu",
+                  "ch_mod_time_fu",
+                  "vig_time_fu",
+                  "ch_vig_time_fu",
+                  "gp_time",
+                  "pn_time",
+                  "physio_time",
+                  "aande_time",
+                  "hb_fu",
+                  "ch_hb_fu",
+                  "wcc_fu",
+                  "ch_wcc_fu",
+                  "na_fu",
+                  "ch_na_fu",
+                  "creat_fu",
+                  "ch_creat_fu",
+                  "gluc_fu",
+                  "ch_gluc_fu",
+                  "hba1c_fu",
+                  "ch_hba1c_fu",
+                  "crp_fu",
+                  "ch_crp_fu",
+                  "plate_fu",
+                  "ch_plate_fu",
+                  "ddimer_fu",
+                  "ch_ddimer_fu",
+                  "urea_fu",
+                  "ch_urea_fu",
+                  "bili_fu",
+                  "ch_bili_fu",
+                  "alt_fu",
+                  "ch_alt_fu",
+                  "ast_fu",
+                  "ch_ast_fu",
+                  "alp_fu",
+                  "ch_alp_fu",
+                  "alb_fu",
+                  "ch_alb_fu",
+                  "ntprobnp_fu",
+                  "ch_ntprobnp_fu",
+                  "chol_fu",
+                  "ch_chol_fu",
+                  "trig_fu",
+                  "ch_trig_fu",
+                  "hdl_fu",
+                  "ch_hdl_fu",
+                  "ldl_fu",
+                  "ch_ldl_fu",
+                  "vldl_fu",
+                  "ch_vldl_fu",
+                  "tni_fu",
+                  "ch_tni_fu",
+                  "egfr_fu",
+                  "ch_egfr_fu",
+                  "pefr_fu",
+                  "fvc_fu",
+                  "fev1_fu",
+                  "fev1fvc_fu",
+                  "ch_pefr_fu",
+                  "ch_fvc_fu",
+                  "ch_fev1_fu",
+                  "ch_fev1fvc_fu",
+                  "grip_fu",
+                  "ch_grip_fu",
+                  "sppb_fu",
+                  "ch_sppb_fu",
+                  "pred_ISWT",
+                  "predic_minus_act_b",
+                  "predic_minus_act_fu"
+                  
+)
+
+categorical_vars <- c("treat",
+                      "site",
+                      "simd_quintile",
+                      "sex",
+                      "group",
+                      "histc19pneu",
+                      "ethnicity_simple",
+                      "smoke",
+                      "hcw",
+                      "icuw",
+                      "rhythm",
+                      "diag_clin",
+                      "diag_pcr",
+                      "diag_antibody",
+                      "diag_antigen",
+                      "diag_cxr",
+                      "diag_ct",
+                      "diag_radbio",
+                      "treat_oxygen",
+                      "treat_ninvresp",
+                      "treat_invvent",
+                      "treat_ecmo",
+                      "treat_inotropes",
+                      "treat_hd",
+                      "hosp",
+                      "who",
+                      "hb_120f",
+                      "hb_130m",
+                      "crp_5",
+                      "ipaq_cat",
+                      "dyspnoea",
+                      "fried_weak",
+                      "fried_slow",
+                      "fried_weight",
+                      "fried_tired",
+                      "fried_active",
+                      "frailty_fried",
+                      "frailty_best",
+                      "frailty_current",
+                      "pem_dhf_f",
+                      "pem_dhf_s",
+                      "pem_nds_f",
+                      "pem_nds_s",
+                      "pem_mts_f",
+                      "pem_mts_s",
+                      "pem_mpt_f",
+                      "pem_mpt_s",
+                      "pem_pds_f",
+                      "pem_pds_s",
+                      "pem_recover",
+                      "pem_worsen_p",
+                      "pem_worsen_m",
+                      "pem_duration",
+                      "acc_data_b",
+                      "eq5d_mo_bl",
+                      "eq5d_sc_bl",
+                      "eq5d_ua_bl",
+                      "eq5d_pd_bl",
+                      "eq5d_ad_bl",
+                      "pre_ang",
+                      "mi",
+                      "prev_revasc",
+                      "hf",
+                      "low_ef",
+                      "stroke",
+                      "tia",
+                      "af",
+                      "vt",
+                      "aortic",
+                      "mitral",
+                      "pulm",
+                      "tric",
+                      "hypercard",
+                      "arcard",
+                      "rvcard",
+                      "hypert",
+                      "congen",
+                      "asthma",
+                      "bronch",
+                      "copd",
+                      "rhino",
+                      "pneu",
+                      "lungc",
+                      "lungf",
+                      "pleural",
+                      "conio",
+                      "eosino",
+                      "pvd",
+                      "sarcoid",
+                      "sleepap",
+                      "c19pneu",
+                      "cov_reinf",
+                      "n_reinf",
+                      "n_reinf_hosp",
+                      "cov_vax",
+                      "cov_vax2",
+                      "cov_vax3",
+                      "cov_vax4",
+                      "treat_arm",
+                      "eq5d_mo_fu",
+                      "eq5d_sc_fu",
+                      "eq5d_ua_fu",
+                      "eq5d_pd_fu",
+                      "eq5d_ad_fu",
+                      "iswt_tired_b",
+                      "iswt_breath_b",
+                      "iswt_chest_b",
+                      "iswt_joint_b",
+                      "iswt_tired_fu",
+                      "iswt_breath_fu",
+                      "iswt_chest_fu",
+                      "iswt_joint_fu",
+                      "ipaq_cat_fu",
+                      "ch_ipaq_cat_fu",
+                      "acc_data_fu",
+                      "gp_any",
+                      "gp_home",
+                      "gp_clinic",
+                      "gp_phone",
+                      "gp_num",
+                      "gp_num_5",
+                      "pn_any",
+                      "pn_home",
+                      "pn_clinic",
+                      "pn_num",
+                      "pn_num_5",
+                      "cac_any",
+                      "cac_home",
+                      "cac_clinic",
+                      "cac_num",
+                      "physio_any",
+                      "physio_home",
+                      "physio_clinic",
+                      "physio_num",
+                      "rehab_any",
+                      "rehab_home",
+                      "rehab_clinic",
+                      "rehab_num",
+                      "aande_any",
+                      "aande_num",
+                      "amru_any",
+                      "amru_num",
+                      "icu_any",
+                      "icu_num",
+                      "ccu_any",
+                      "ccu_num",
+                      "med_any",
+                      "med_num",
+                      "coe_any",
+                      "coe_num",
+                      "surg_any",
+                      "surg_num",
+                      "adh",
+                      "iswt_tired_ch",
+                      "iswt_breath_ch",
+                      "iswt_chest_ch",
+                      "iswt_joint_ch"
+)
+
+
+
+#Run the function
+
+numeric_summary <- bind_rows(lapply(numeric_vars, summarize_numeric, group = "pem_group"))
+categorical_summary <- bind_rows(lapply(categorical_vars, summarize_categorical, group = "pem_group"))
+
+
+summary_table <- bind_rows(
+  numeric_summary %>% mutate(level = ""),
+  categorical_summary
+)
+
+
+summary_table_wide <- summary_table %>%
+  pivot_wider(names_from = Group, values_from = c(value, p), names_sep = "_") %>%
+  select(variable, level, starts_with("value"), starts_with("p"))
+
+print(summary_table_wide)
+write.csv(summary_table_wide, "summary_table_pemecfs_yesno_intervention_standard_care.csv", row.names = FALSE)
+
+data <- read.csv("CISCO21_base_v1_3_withdpqvariable_medhx.csv", stringsAsFactors = FALSE)
+
+
+###Set factors
+data <- data %>%
+  mutate(across(c(
+    treat,
+    site,
+    simd_quintile,
+    sex,
+    group,
+    histc19pneu,
+    ethnicity_simple,
+    smoke,
+    hcw,
+    icuw,
+    rhythm,
+    diag_clin,
+    diag_pcr,
+    diag_antibody,
+    diag_antigen,
+    diag_cxr,
+    diag_ct,
+    diag_radbio,
+    treat_oxygen,
+    treat_ninvresp,
+    treat_invvent,
+    treat_ecmo,
+    treat_inotropes,
+    treat_hd,
+    hosp,
+    who,
+    hb_120f,
+    hb_130m,
+    crp_5,
+    ipaq_cat,
+    dyspnoea,
+    fried_weak,
+    fried_slow,
+    fried_weight,
+    fried_tired,
+    fried_active,
+    frailty_fried,
+    frailty_best,
+    frailty_current,
+    pem_dhf_f,
+    pem_dhf_s,
+    pem_nds_f,
+    pem_nds_s,
+    pem_mts_f,
+    pem_mts_s,
+    pem_mpt_f,
+    pem_mpt_s,
+    pem_pds_f,
+    pem_pds_s,
+    pem_recover,
+    pem_worsen_p,
+    pem_worsen_m,
+    pem_duration,
+    acc_data,
+    pre_ang,
+    mi,
+    prev_revasc,
+    hf,
+    low_ef,
+    stroke,
+    tia,
+    af,
+    vt,
+    aortic,
+    mitral,
+    pulm,
+    tric,
+    hypercard,
+    arcard,
+    rvcard,
+    hypert,
+    congen,
+    asthma,
+    bronch,
+    copd,
+    rhino,
+    pneu,
+    lungc,
+    lungf,
+    pleural,
+    conio,
+    eosino,
+    pvd,
+    sarcoid,
+    sleepap,
+    c19pneu,
+    cov_reinf,
+    n_reinf,
+    n_reinf_hosp,
+    cov_vax,	
+    cov_vax2,
+    cov_vax3,
+    cov_vax4,
+    iswt_tired,
+    iswt_breath,
+    iswt_chest,
+    iswt_joint,
+    depaul_completed,
+    coviddays_90
+    
+  ), as.factor))
+
+#Summarise the numerical data
+
+summarize_numeric <- function(var, group) {
+  df <- data %>%
+    select(all_of(c(var,group))) %>%
+    drop_na()
+  
+  ##sense check
+  if (nlevels(factor(df[[group]])) !=2) {
+    stop(paste("Grouping variable", group, "must have 2 levels to proceed. If not, check underlying file"))
+  }
+  
+  
+  
+  
+  #Function to summarise
+  
+  get_stats <- function(x) {
+    tibble(
+      mean = round(mean(x), 2),
+      sd = round(sd(x), 2),
+      median = round(median(x), 2),
+      Q1 = round(quantile(x, 0.25), 2),
+      Q3 = round(quantile(x, 0.75), 2),
+      IQR = round(IQR(x), 2)
+    )
+  }
+  
+  all_stats <- df %>%
+    summarise (get_stats(.data[[var]])) %>%
+    mutate(Group = "All")
+  
+  by_group <- df %>%
+    group_by(.data[[group]]) %>%
+    summarise(get_stats(.data[[var]]), .group = "drop") %>%
+    rename(Group = 1)
+  
+  test <- wilcox.test(reformulate(group, var), data = df)
+  pval <- round(test$p.value, 3)
+  
+  bind_rows(all_stats, by_group) %>%
+    mutate(variable = var,
+           value = paste0(
+             mean, " (", sd, "); ",
+             median, " (", Q1, ", ", Q3, ")"
+           ),
+           p = if_else(Group == "All", as.character(pval), "")) %>%
+    select(variable, Group, value, p)
+}
+
+
+
+#Now summarise the categorical data
+
+summarize_categorical <- function(var, group) {
+  df <- data %>%
+    select(all_of(c(var,group))) %>%
+    drop_na()
+  
+  df[[var]] <- as.factor(df[[var]])
+  df[[group]] <- as.factor(df[[group]])
+  
+  all_stats <- df %>%
+    group_by(.data[[var]]) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    mutate(percent = round(n / sum(n)*100, 1),
+           Group = "All") %>%
+    mutate(value = paste0(n, " (", percent, "%)")) %>%
+    select(Group, value, !!sym(var))
+  
+  by_group <- df %>%
+    group_by(.data[[group]], .data[[var]]) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(.data[[group]]) %>%
+    mutate(percent = round(n/ sum(n)*100, 1)) %>%
+    mutate(value = paste0(n, " (", percent, "%)")) %>%
+    rename(Group = 1) %>%
+    select(Group, value, !!sym(var))
+  
+  chi <- suppressWarnings(chisq.test(table(df[[var]], df[[group]])))
+  pval <- round(chi$p.value, 3)
+  
+  bind_rows(all_stats, by_group) %>%
+    rename(level = 3) %>%
+    mutate(variable = var,
+           p= if_else(Group == "All" & row_number() == 1, as.character(pval), "")) %>%
+    select(variable, level, Group, value, p)
+}
+
+
+
+####Define variables here
+numeric_vars <- c("age",
+                  "height",
+                  "weight",
+                  "bmi",
+                  "waist",
+                  "sbp",
+                  "dbp",
+                  "hr",
+                  "coviddays",
+                  "hb",
+                  "wcc",
+                  "na",
+                  "creat",
+                  "gluc",
+                  "hba1c",
+                  "crp",
+                  "plate",
+                  "ddimer",
+                  "urea",
+                  "bili",
+                  "alt",
+                  "ast",
+                  "alp",
+                  "alb",
+                  "ntprobnp",
+                  "chol",
+                  "trig",
+                  "hdl",
+                  "ldl",
+                  "vldl",
+                  "tni",
+                  "egfr",
+                  "pefr",
+                  "fvc",
+                  "fev1",
+                  "fev1fvc",
+                  "grip",
+                  "sppb",
+                  "eq5d_hu",
+                  "eq5d_vas",
+                  "phq_anx",
+                  "phq_dep",
+                  "phq",
+                  "bip",
+                  "dasi",
+                  "dasi_vo2max",
+                  "fatigue_score",
+                  "sleep_time",
+                  "sleep_eff",
+                  "sed_time",
+                  "light_time",
+                  "mod_time",
+                  "vig_time",
+                  "fatigue_vas",
+                  "iswt",
+                  "iswt_shuttles",
+                  "iswt_shuttles_imp"
+                  
+                  
+)
+
+categorical_vars <- c("treat",
+                      "site",
+                      "simd_quintile",
+                      "sex",
+                      "group",
+                      "histc19pneu",
+                      "ethnicity_simple",
+                      "smoke",
+                      "hcw",
+                      "icuw",
+                      "rhythm",
+                      "diag_clin",
+                      "diag_pcr",
+                      "diag_antibody",
+                      "diag_antigen",
+                      "diag_cxr",
+                      "diag_ct",
+                      "diag_radbio",
+                      "treat_oxygen",
+                      "treat_ninvresp",
+                      "treat_invvent",
+                      "treat_ecmo",
+                      "treat_inotropes",
+                      "treat_hd",
+                      "hosp",
+                      "who",
+                      "hb_120f",
+                      "hb_130m",
+                      "crp_5",
+                      "ipaq_cat",
+                      "dyspnoea",
+                      "fried_weak",
+                      "fried_slow",
+                      "fried_weight",
+                      "fried_tired",
+                      "fried_active",
+                      "frailty_fried",
+                      "frailty_best",
+                      "frailty_current",
+                      "pem_dhf_f",
+                      "pem_dhf_s",
+                      "pem_nds_f",
+                      "pem_nds_s",
+                      "pem_mts_f",
+                      "pem_mts_s",
+                      "pem_mpt_f",
+                      "pem_mpt_s",
+                      "pem_pds_f",
+                      "pem_pds_s",
+                      "pem_recover",
+                      "pem_worsen_p",
+                      "pem_worsen_m",
+                      "pem_duration",
+                      "pre_ang",
+                      "mi",
+                      "prev_revasc",
+                      "hf",
+                      "low_ef",
+                      "stroke",
+                      "tia",
+                      "af",
+                      "vt",
+                      "aortic",
+                      "mitral",
+                      "pulm",
+                      "tric",
+                      "hypercard",
+                      "arcard",
+                      "rvcard",
+                      "hypert",
+                      "congen",
+                      "asthma",
+                      "bronch",
+                      "copd",
+                      "rhino",
+                      "pneu",
+                      "lungc",
+                      "lungf",
+                      "pleural",
+                      "conio",
+                      "eosino",
+                      "pvd",
+                      "sarcoid",
+                      "sleepap",
+                      "c19pneu",
+                      "cov_reinf",
+                      "n_reinf",
+                      "n_reinf_hosp",
+                      "cov_vax",
+                      "cov_vax2",
+                      "cov_vax3",
+                      "cov_vax4",
+                      "coviddays_90"
+)
+
+
+
+
+#Run the function
+
+numeric_summary <- bind_rows(lapply(numeric_vars, summarize_numeric, group = "depaul_completed"))
+categorical_summary <- bind_rows(lapply(categorical_vars, summarize_categorical, group = "depaul_completed"))
+
+
+summary_table <- bind_rows(
+  numeric_summary %>% mutate(level = ""),
+  categorical_summary
+)
+
+
+summary_table_wide <- summary_table %>%
+  pivot_wider(names_from = Group, values_from = c(value, p), names_sep = "_") %>%
+  select(variable, level, starts_with("value"), starts_with("p"))
+
+print(summary_table_wide)
+write.csv(summary_table_wide, "summary_table_depaul_completed_yesno2.csv", row.names = FALSE)
